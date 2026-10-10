@@ -1,0 +1,35 @@
+name: TestSprite AI Automated Verification
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Optional scheduled nightly AI verification run
+    - cron: '0 2 * * *'
+
+jobs:
+  testsprite-verify:
+    name: TestSprite Cloud AI Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install TestSprite CLI
+        run: npm install -g @testsprite/testsprite-cli
+
+      - name: Run TestSprite Doctor Check
+        env:
+          TESTSPRITE_API_KEY: ${{ secrets.TESTSPRITE_API_KEY }}
+        run: testsprite doctor || true
+
+      - name: Execute TestSprite AI Verification
+        if: env.TESTSPRITE_API_KEY != ''
+        env:
+          TESTSPRITE_API_KEY: ${{ secrets.TESTSPRITE_API_KEY }}
+        run: |
+          echo "Executing TestSprite AI verification suite..."
+          testsprite test run --profile default

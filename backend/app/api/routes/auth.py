@@ -30,8 +30,14 @@ async def login(request: Request, db: Session = Depends(get_db)):
             raise HTTPException(status_code=400, detail="Missing username or password")
         login_req = LoginRequest(email=str(username), password=str(password))
     else:
-        body = await request.json()
-        login_req = LoginRequest(**body)
+        try:
+            body = await request.json()
+            login_req = LoginRequest(**body)
+        except Exception:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Invalid login credentials format or missing required fields"
+            )
 
     user = authenticate_user(db, login_req)
     access_token = create_access_token(subject=user.id)

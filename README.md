@@ -48,63 +48,107 @@ graph TD
 | **Primary Responder** | `responder@opspulse.local` | `responder123` |
 | **DevOps Responder** | `devops@opspulse.local` | `devops123` |
 
+## Prerequisites
+
+- **Python**: 3.10+ (tested on Python 3.13)
+- **Node.js**: 18.x or 20.x+ with npm
+- **PostgreSQL**: 14+ (default local development port `5433` or standard `5432`)
+- **Redis**: 6+ (optional for local dev lifespan loop; required for production Celery worker)
+
+---
+
+## Environment Configuration
+
+A template configuration file is provided at `.env.example`. Create your local environment configuration:
+
+```bash
+# In project root or backend directory:
+cp .env.example backend/.env
+```
+
+Key environment variables:
+- `DATABASE_URL`: PostgreSQL connection string (e.g., `postgresql://postgres@localhost:5433/opspulse`)
+- `REDIS_URL`: Redis broker URL (e.g., `redis://localhost:6379/0`)
+- `SECRET_KEY`: JWT authentication secret token
+- `DEFAULT_ACK_TIMEOUT_SECONDS`: Default SLA deadline for unacknowledged incidents (default `300` seconds / 5 minutes)
+- `ESCALATION_CHECK_INTERVAL_SECONDS`: Frequency of background SLA breach checks (default `10` seconds)
+- `VITE_API_BASE_URL`: Frontend target API address (default `http://localhost:8000`)
+
 ---
 
 ## Quickstart Instructions
 
-### 1. Backend Setup
+### 1. Starting PostgreSQL and Redis
+
+#### Option A: Using Local PostgreSQL Daemon
+If PostgreSQL is installed locally, ensure the service is running and create the `opspulse` database:
+```bash
+createdb -p 5433 opspulse
+```
+
+#### Option B: Using Docker for Infrastructure Services
+```bash
+docker compose up -d postgres redis
+```
+
+---
+
+### 2. Backend Setup & Data Seeding
 
 ```bash
 cd backend
 
-# Install dependencies
+# Install Python dependencies
 python -m pip install -r requirements.txt
 
-# Run migrations
-alembic upgrade head
+# Apply Alembic database migrations
+python -m alembic upgrade head
 
-# Seed realistic demonstration data
+# Seed initial organization, services, users, and incidents
 python -m app.db.seed
 
-# Run automated tests
-pytest app/tests
+# Run backend unit and integration test suite (15 tests)
+python -m pytest
 
-# Start development server
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+# Start FastAPI development server
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-Backend will be accessible at:
-- API Base: `http://localhost:8000/api/v1`
-- OpenAPI Swagger UI: `http://localhost:8000/docs`
-- Health check: `http://localhost:8000/health`
-- Readiness probe: `http://localhost:8000/ready`
+---
 
-### 2. Frontend Setup
+### 3. Frontend Setup
 
 ```bash
 cd frontend
 
-# Install dependencies
+# Install Node dependencies
 npm install
-
-# Run linter
-npm run lint
 
 # Build for production
 npm run build
 
-# Start development server
+# Start Vite development server
 npm run dev
 ```
 
-Frontend application will be accessible at: `http://localhost:5173`
+---
+
+## Accessing the Application
+
+- **Web Application**: [http://localhost:5173](http://localhost:5173)
+- **FastAPI OpenAPI Swagger Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **FastAPI ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **OpenAPI JSON Schema**: [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json)
+- **Backend Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+- **Backend Readiness Probe**: [http://localhost:8000/ready](http://localhost:8000/ready)
 
 ---
 
-## Docker Setup
+## Docker Compose (Full Stack)
+
+To run the entire platform (PostgreSQL, Redis, Backend, Celery Worker, Frontend) inside containers:
 
 ```bash
-# Start all services (PostgreSQL, Redis, Backend, Celery Worker, Frontend)
 docker compose up --build -d
 ```
 
@@ -124,3 +168,11 @@ curl -X POST http://localhost:8000/api/v1/alerts/webhook \
     "metadata": {"host": "pg-primary-01.internal", "region": "us-east-1"}
   }'
 ```
+
+---
+
+## Known Limitations
+
+1. **Third-Party Alert Channels**: Real external SMTP email dispatch and SMS gateways are abstracted. Notifications are recorded persistently in the database `notifications` table and audit timeline.
+2. **Background Escalation in Local Development**: In local development without Redis, the FastAPI application lifespan event runs an asynchronous background loop checking SLA deadlines every 10 seconds. In production Docker environments, the dedicated Celery worker process handles escalation queues.
+3. **Correlation Window**: Alert deduplication currently operates within a configurable 15-minute window (`ALERT_CORRELATION_WINDOW_MINUTES`) based on SHA-256 fingerprint matching across open incidents.
