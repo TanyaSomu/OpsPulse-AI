@@ -16,9 +16,9 @@ test.describe('OpsPulse AI — AI-Generated E2E Automated Test Suite', () => {
     await page.click('[data-testid="btn-login-submit"]');
 
     // Wait for redirect to dashboard
+    await expect(page.locator('[data-testid="stat-active-incidents"]')).toBeVisible({ timeout: 10000 });
     await expect(page).toHaveURL('/');
     await expect(page.locator('text=Service Reliability Dashboard')).toBeVisible();
-    await expect(page.locator('[data-testid="stat-active-incidents"]')).toBeVisible();
   });
 
   test('TC-DASH-04: Dashboard displays 6 metric KPI cards with live telemetry', async ({ page }) => {
